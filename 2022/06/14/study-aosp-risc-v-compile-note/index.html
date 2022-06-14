@@ -1,0 +1,155 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Aosp risc-v 架构镜像编译笔记 | Arknights</title><script>var config = {"hostname":"http://example.com","root":"/","preload":false,"path":""}</script><link rel="stylesheet" href="/css/arknights.css"><link rel="stylesheet" href="//unpkg.com/@highlightjs/cdn-assets@11.4.0/styles/atom-one-dark-reasonable.min.css"><style>@font-face {
+ font-family: BenderLight;
+ src: local('Bender'), url("/font/BenderLight.ttf");
+}
+@font-face {
+ font-family: 'JetBrains Mono';
+ src: local('JetBrains Mono'), url('/font/JetBrainsMono-Regular.woff2') format('woff2');
+}</style><meta name="generator" content="Hexo 6.1.0"></head><body style="background-image:url(https://ak.hypergryph.com/assets/index/images/ak/pc/bk.jpg);"><div id="cursor-container"><div id="cursor-outer"></div><div id="cursor-effect"></div></div><main><header><nav><div class="navBtn"><i class="navBtnIcon"><span class="navBtnIconBar"></span><span class="navBtnIconBar"></span><span class="navBtnIconBar"></span></i></div><ol class="navContent"><li class="navItem search-header"><input autocomplete="off" autocorrect="off" autocapitalize="none" placeholder="数据检索" spellcheck="false" maxlength="50" type="text" id="search-input"></li><li class="navItem"><a href="/"><span class="navItemTitle">Home</span></a></li><li class="navItem"><a href="/archives/"><span class="navItemTitle">Archives</span></a></li></ol></nav><div class="search-popup"><div id="search-result"></div></div></header><article><div id="post-bg"><div id="post-title"><h1>Aosp risc-v 架构镜像编译笔记</h1><div id="post-info"><span>First Post:<span class="control"><time datetime="2022-06-14T00:52:39.000Z" id="date"> 2022-06-14</time></span></span><br><span>Last Update:<span class="control"><time datetime="2022-06-14T00:54:54.790Z" id="updated"> 2022-06-14</time></span></span></div></div><hr><div id="post-content"><p>优先参考文档:</p>
+<p><strong><a target="_blank" rel="noopener" href="https://github.com/aosp-riscv/working-group/blob/master/docs/zh/howto-build-aosp-riscv.md">https://github.com/aosp-riscv/working-group/blob/master/docs/zh/howto-build-aosp-riscv.md</a></strong></p>
+<blockquote>
+<p>CN-gitee(清华镜像源拉取):</p>
+<p>工作区:<a target="_blank" rel="noopener" href="https://gitee.com/aosp-riscv/working-group">https://gitee.com/aosp-riscv/working-group</a></p>
+<p>清单:<a target="_blank" rel="noopener" href="https://gitee.com/aosp-riscv/platform_manifest">https://gitee.com/aosp-riscv/platform_manifest</a></p>
+</blockquote>
+<blockquote>
+<p>README文件引用:</p>
+<p><strong>如何编译 aosp-riscv</strong></p>
+<p>注：提供此文档为方便国内参与小伙伴。</p>
+<!-- TOC -->
+
+<ul>
+<li><a href="#1-%E7%A1%AC%E4%BB%B6%E7%8E%AF%E5%A2%83">1. 硬件环境</a></li>
+<li><a href="#2-%E5%AE%89%E8%A3%85%E4%BE%9D%E8%B5%96%E8%BD%AF%E4%BB%B6">2. 安装依赖软件</a></li>
+<li><a href="#3-%E5%AE%89%E8%A3%85-repo">3. 安装 repo</a></li>
+<li><a href="#4-%E4%B8%8B%E8%BD%BD%E6%BA%90%E7%A0%81">4. 下载源码</a></li>
+<li><a href="#5-%E7%BC%96%E8%AF%91">5. 编译</a></li>
+<li><a href="#6-%E6%9E%84%E5%BB%BA-clang-llvm-%E5%B7%A5%E5%85%B7%E9%93%BE">6. 构建 Clang llvm 工具链</a></li>
+<li><a href="#7-%E6%9E%84%E5%BB%BA-rust-%E5%B7%A5%E5%85%B7%E9%93%BE">7. 构建 Rust 工具链</a></li>
+</ul>
+<!-- /TOC -->
+
+<h1 id="1-硬件环境"><a href="#1-硬件环境" class="headerlink" title="1. 硬件环境"></a>1. 硬件环境</h1><p>本文所有操作在以下系统环境下验证通过</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs plaintext">$ lsb_release -a<br>No LSB modules are available.<br>Distributor ID: Ubuntu<br>Description:    Ubuntu 18.04.6 LTS<br>Release:        18.04<br>Codename:       bionic<br></code></pre></td></tr></table></figure>
+
+<h1 id="2-安装依赖软件"><a href="#2-安装依赖软件" class="headerlink" title="2. 安装依赖软件"></a>2. 安装依赖软件</h1><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs plaintext">$ sudo apt install git-core gnupg flex bison build-essential zip curl zlib1g-dev \<br>                   gcc-multilib g++-multilib libc6-dev-i386 libncurses5 \<br>                   lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev \<br>                   libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig python<br></code></pre></td></tr></table></figure>
+
+<h1 id="3-安装-repo"><a href="#3-安装-repo" class="headerlink" title="3. 安装 repo"></a>3. 安装 repo</h1><p>下载（参考 <a target="_blank" rel="noopener" href="https://mirrors.tuna.tsinghua.edu.cn/help/git-repo/">清华大学开源软件镜像站 Git Repo 镜像使用帮助</a>）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs plaintext">$ curl https://mirrors.tuna.tsinghua.edu.cn/git/git-repo -o repo<br>$ chmod +x repo<br></code></pre></td></tr></table></figure>
+
+<p>为了方便可以将其拷贝到你的 PATH 里。</p>
+<p>repo 运行过程中会尝试访问官方的 git 源更新自己，如果想使用 tuna 的镜像源进行更新，可以<br>将如下内容复制到你的 <code>~/.bashrc</code> 里并重启终端生效。</p>
+<p>安装好后可以运行 <code>repo version</code> 检查效果，出现类似以下输出说明安装成功。repo 版本需要 2.15 以上。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><code class="hljs plaintext">$ repo version<br>&lt;repo not installed&gt;<br>repo launcher version 2.17<br>       (from /home/wangchen/bin/repo)<br>git 2.17.1<br>Python 3.6.9 (default, Jan 26 2021, 15:33:00)<br>[GCC 8.4.0]<br>OS Linux 4.15.0-144-generic (#148-Ubuntu SMP Sat May 8 02:33:43 UTC 2021)<br>CPU x86_64 (x86_64)<br>Bug reports: https://bugs.chromium.org/p/gerrit/issues/entry?template=Repo+tool+issue<br></code></pre></td></tr></table></figure>
+
+<h1 id="4-下载源码"><a href="#4-下载源码" class="headerlink" title="4. 下载源码"></a>4. 下载源码</h1><p>创建一个 AOSP 的源码构建目录，这里假设为 <code>/home/u/aosp</code>，然后进入 aosp 目录</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs plaintext">$ mkdir -p /home/u/aosp<br>$ cd /home/u/aosp<br></code></pre></td></tr></table></figure>
+
+<p>进入 AOSP 构建目录后执行以下命令下载 AOSP 的源码</p>
+<p>注：由于采用的是 Gitee 上的 aosp-riscv 开发仓库，以及采用国内清华源的 AOSP 镜像作为缺省 remote，将大大方便国内用户下载代码。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs plaintext">$ repo init -u git@gitee.com:aosp-riscv/platform_manifest.git -b riscv64-android-12.0.0_dev_cn<br>$ repo sync -j8<br></code></pre></td></tr></table></figure>
+
+<h1 id="5-编译"><a href="#5-编译" class="headerlink" title="5. 编译"></a>5. 编译</h1><p>注意：因为还在开发过程中，当前还不支持完整的编译 <code>m</code>。</p>
+<p>下面是一个例子，编译 aosp 但不运行最终的 ninja 构建。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs plaintext">$ cd /home/u/aosp<br>$ source ./build/envsetup.sh<br>$ lunch aosp_riscv64-eng<br>$ m --skip-ninja<br></code></pre></td></tr></table></figure>
+
+<h1 id="6-构建-Clang-llvm-工具链"><a href="#6-构建-Clang-llvm-工具链" class="headerlink" title="6. 构建 Clang llvm 工具链"></a>6. 构建 Clang llvm 工具链</h1><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs plaintext">$ mkdir llvm-toolchain &amp;&amp; cd llvm-toolchain<br>$ repo init -u git@github.com:aosp-riscv/platform_manifest.git -b riscv64-llvm-master<br>$ repo sync -c<br>$ python toolchain/llvm_android/build.py<br></code></pre></td></tr></table></figure>
+
+<h1 id="7-构建-Rust-工具链"><a href="#7-构建-Rust-工具链" class="headerlink" title="7. 构建 Rust 工具链"></a>7. 构建 Rust 工具链</h1><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs plaintext">$ mkdir rust-toolchain &amp;&amp; cd rust-toolchain<br>$ repo init -u git@github.com:riscv-android-src/manifest.git -b riscv64-android12-rust-toolchain-dev<br>$ repo sync -c<br>$ python toolchain-android_rust/build.py<br></code></pre></td></tr></table></figure>
+</blockquote>
+<h3 id="以下为我个人尝试的操作"><a href="#以下为我个人尝试的操作" class="headerlink" title="以下为我个人尝试的操作:"></a>以下为我个人尝试的操作:</h3><p>安装依赖:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs bash">sudo apt-get install git build-essential python3  qemu-kvm  ninja-build python3-pip ccache<br><span class="hljs-comment">#python3和官方不一样 换成了python3 如果有问题请换回python2</span><br><span class="hljs-comment">#python3-pip和官方不一样 python-pip已经弃用</span><br></code></pre></td></tr></table></figure>
+
+<p>安装repo(官方和清华版本二选一):</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs sh"><span class="hljs-built_in">mkdir</span> <span class="hljs-variable">$HOME</span>/bin<br>curl http://commondatastorage.googleapis.com/git-repo-downloads/repo &gt; <span class="hljs-variable">$HOME</span>/bin/repo<br><span class="hljs-built_in">chmod</span> 700 <span class="hljs-variable">$HOME</span>/bin/repo<br></code></pre></td></tr></table></figure>
+
+<p>安装清华repo:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><code class="hljs sh"><span class="hljs-built_in">mkdir</span> <span class="hljs-variable">$HOME</span>/bin<br>curl https://mirrors.tuna.tsinghua.edu.cn/git/git-repo -o repo &gt; <span class="hljs-variable">$HOME</span>/bin/repo<br><span class="hljs-built_in">chmod</span> +x repo<br><span class="hljs-built_in">export</span> REPO_URL=<span class="hljs-string">&#x27;https://mirrors.tuna.tsinghua.edu.cn/git/git-repo&#x27;</span><span class="hljs-comment">#推荐添加</span><br><span class="hljs-comment">#详细介绍:https://mirrors.tuna.tsinghua.edu.cn/help/git-repo/</span><br></code></pre></td></tr></table></figure>
+
+<p>添加到系统变量:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs sh">sudo nano /etc/profile<br><span class="hljs-built_in">source</span> /etc/profile <span class="hljs-comment">#刷新变量</span><br></code></pre></td></tr></table></figure>
+
+<p>基本构建命令:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><code class="hljs sh"><span class="hljs-built_in">mkdir</span> ~/riscv-android-src &amp;&amp; <span class="hljs-built_in">cd</span> ~/riscv-android-src<br>repo init -u git@gitee.com:aosp-riscv/platform_manifest.git -b riscv64-android-12.0.0_dev_cn<br>repo <span class="hljs-built_in">sync</span> -j8<br><span class="hljs-comment"># 经测试,这部分命令并未生效</span><br><span class="hljs-comment"># cd prebuilts/rust/</span><br><span class="hljs-comment"># git lfs pull</span><br><span class="hljs-comment"># cd -</span><br><span class="hljs-comment"># cd  prebuilts/clang/host/linux-x86/</span><br><span class="hljs-comment"># git lfs pull</span><br><span class="hljs-comment"># cd -</span><br><span class="hljs-comment"># rm external/angle/Android.bp</span><br><span class="hljs-built_in">source</span> build/envsetup.sh<br>lunch sdk_phone64_riscv64<br>m -j8<br></code></pre></td></tr></table></figure>
+
+<h3 id="以下为报错和相关处理"><a href="#以下为报错和相关处理" class="headerlink" title="以下为报错和相关处理:"></a>以下为报错和相关处理:</h3><p>&#x2F;usr&#x2F;bin&#x2F;env: “python”: 没有那个文件或目录——解决办法</p>
+<p>如果没有安装Python，安装Python3.8</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">sudo apt-get install python3<br></code></pre></td></tr></table></figure>
+
+<p>如果安装了Python3.8，则没配置Python软链接</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><code class="hljs bash"><span class="hljs-comment">#找Python3.8位置</span><br>whereis python3.8<br><span class="hljs-comment">#配置软连接</span><br><span class="hljs-built_in">cd</span> /usr/bin<br>sudo <span class="hljs-built_in">ln</span> -s /usr/bin/python3.8 python<br></code></pre></td></tr></table></figure>
+
+<p>报错:ERROR: Unable to locate libtinfo.so.5(下面还有一个解决办法)</p>
+<blockquote>
+<p>README引用:</p>
+<h3 id="ubuntu19-04-x2F-Manjro编译Android-Pie源码缺少libtinfo-so-5问题"><a href="#ubuntu19-04-x2F-Manjro编译Android-Pie源码缺少libtinfo-so-5问题" class="headerlink" title="ubuntu19.04&#x2F;Manjro编译Android Pie源码缺少libtinfo.so.5问题"></a>ubuntu19.04&#x2F;Manjro编译Android Pie源码缺少libtinfo.so.5问题</h3><h3 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h3><p>使用ubuntu19.04编译Android源码的时候，报缺少libtinfo.so.5</p>
+<h3 id="解决方法"><a href="#解决方法" class="headerlink" title="解决方法"></a>解决方法</h3><p>通过find命令查看，发现确实没有这个文件，默认已经升级到libinfo.so.6版本了，搜索发现重装个包就可以了.</p>
+<p>查看一下库:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs sh"><span class="hljs-built_in">ls</span> /lib/x86_64-linux-gnu/libtinfo.so.* <span class="hljs-comment">#查看一下库</span><br>/lib/x86_64-linux-gnu/libtinfo.so.6  /lib/x86_64-linux-gnu/libtinfo.so.6.2<br></code></pre></td></tr></table></figure>
+
+<p>安装缺少的库:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">sudo apt install libncurses5<br></code></pre></td></tr></table></figure>
+
+<p>装完后，可能需要重启terminal才能生效</p>
+<p>Manjaro</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs bash">sudo pacman -S ncurses5-compat-libs<br><span class="hljs-comment">#或</span><br>sudo pacman -S libtinfo5<br><span class="hljs-comment">#这两条命令会安装一样的包</span><br></code></pre></td></tr></table></figure>
+
+<p>附软链接删除命令:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">sudo <span class="hljs-built_in">rm</span> libtinfo.so.5 <span class="hljs-comment">#已测试有效性未测试安全性</span><br></code></pre></td></tr></table></figure>
+
+<p>来源：<a target="_blank" rel="noopener" href="https://blog.csdn.net/yongwn/article/details/97610813">https://blog.csdn.net/yongwn/article/details/97610813</a></p>
+</blockquote>
+<p>如果你发现你一直连不上git 说你没有权限 你可以先去生成个ssh再试试(不要像我个笨蛋一直以为自己网络有问题)</p>
+<p>设置用户:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs sh">git config --global user.name <span class="hljs-string">&quot;your name&quot;</span><br>git config --globa user.email <span class="hljs-string">&quot;your email.com&quot;</span> <br></code></pre></td></tr></table></figure>
+
+<p>生成密钥</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs sh">ssh-keygen -t rsa -C <span class="hljs-string">&quot;your_email@example.com&quot;</span> <span class="hljs-comment">#记得把目录记录下来</span><br>ssh -T git@github.com <span class="hljs-comment">#测试</span><br></code></pre></td></tr></table></figure>
+
+<p>编译时候有可能内存不够,需要点swap来帮助一下</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><code class="hljs sh"><span class="hljs-built_in">cd</span> / <span class="hljs-comment">#到根目录</span><br>sudo <span class="hljs-built_in">mkdir</span> swap<br><span class="hljs-built_in">cd</span> /swap/<br>sudo <span class="hljs-built_in">dd</span> <span class="hljs-keyword">if</span>=/dev/zero of=swapfile bs=1M count=20480 <span class="hljs-comment">#新建20GBswap文件</span><br>sudo mkswap swapfile<br>sudo swapon swapfile<br>sudo <span class="hljs-built_in">cp</span> /etc/fstab /etc/fstab.bak<br><span class="hljs-built_in">echo</span> <span class="hljs-string">&#x27;/swap/swapfile none swap sw 0 0&#x27;</span> | sudo <span class="hljs-built_in">tee</span> -a /etc/fstab <span class="hljs-comment">#将swapfile路径内容写入到/etc/fstab文件当中</span><br>free -h<br></code></pre></td></tr></table></figure>
+
+<p>&#x2F;bin&#x2F;bash: m4未找到命令:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sh">sudo apt install m4 <span class="hljs-comment">#m4是个什么奇怪东西</span><br></code></pre></td></tr></table></figure>
+
+<p>libncurses.so.5找不到:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><code class="hljs sh"><span class="hljs-built_in">ls</span> /lib/x86_64-linux-gnu/libtinfo.so.* <span class="hljs-comment">#查看一下库</span><br><span class="hljs-comment">#新版Ubuntu似乎没有这个库了</span><br>libncurses.so.5: cannot open shared object file: No such file or directory<br>sudo apt-get install libncurses5-dev<br><span class="hljs-comment">#不知道哪个有用 建议都试试(</span><br>sudo apt install apt-file<br>sudo apt-file update<br>sudo apt-file find libncurses.so.5<br>sudo apt install libncurses5<br></code></pre></td></tr></table></figure>
+
+<p>git：’lfs’ 不是一个 git 命令。参见 ‘git –help’:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sh">sudo apt install git-lfs<br></code></pre></td></tr></table></figure>
+
+<p>repo sync多线程(效果很明显 推荐使用):</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sh">repo <span class="hljs-built_in">sync</span> -j 4 <span class="hljs-comment">#四个线程下载 默认为两个</span><br></code></pre></td></tr></table></figure>
+
+<blockquote>
+<p>Android repo技巧：repo sync同步Android源码时减少同步时间和代码空间<br>在使用 repo sync 同步 Android 源码时，可以添加一些选项来减少同步时间和要下载的代码空间。具体的命令是:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sh">repo <span class="hljs-built_in">sync</span> -c --no-tags --prune -j 4<br></code></pre></td></tr></table></figure>
+
+<p>查看 repo help status 的帮助信息，对所给的各个选项具体说明如下：</p>
+<p>-c, –current-branch fetch only current branch from server.<br>这个选项指定只获取执行 repo init 时 -b 选项所指定的分支，不会获取远端服务器的分支信息。<br>例如服务器上新增了其他分支，使用 -c 选项同步后，在本地 git 仓库执行 <code>git branch -r</code> 命令看不到服务器新增的分支名。如果不加 -c 选项，那么同步的时候，会打印 [new branch] 这样的信息，使用 git branch -r 命令可查看到服务器新增的分支。</p>
+<p>–no-tags don’t fetch tags.<br>该选项指定不获取服务器上的tag信息。<br>–prune delete refs that no longer exist on the remote.<br>如果远端服务器已经删除了某个分支，在 <code>repo sync</code> 时加上 <code>--prune</code> 选项，可以让本地仓库删除对这个分支的跟踪引用。</p>
+<p>查看 repo 的 .repo&#x2F;repo&#x2F;project.py 源码，这个选项实际上是作为 <code>git fetch</code> 命令的选项来执行。查看 man git-fetch 对自身 <code>--prune</code> 选项的说明如下，可供参考：</p>
+<p>-p, –prune<br>After fetching, remove any remote-tracking references that no longer exist on the remote.<br>-j JOBS, –jobs&#x3D;JOBS projects to fetch simultaneously (default 2).<br>指定启用多少个线程来同步。<br>例如上面的 -j 4 指定用4个线程来同步。如果没有提供该选项，默认是用2个线程。</p>
+<p>总的来说，在 <code>repo sync -c --no-tags --prune -j 4</code> 命令中，使用 -c 和 –no-tags 选项可以减少需要同步的内容，从而减少要占用的本地代码空间，也可以减少一些同步时间。</p>
+<p>使用 -j 选项来指定启用多线程进行同步，可以加快执行速度，也就减少了同步时间。</p>
+<p>使用 –prune 选项去掉已删除分支的跟踪引用，一般不会用到，这个选项可加可不加。</p>
+<p>文章来源:<a target="_blank" rel="noopener" href="https://segmentfault.com/a/1190000020983392">https://segmentfault.com/a/1190000020983392</a></p>
+</blockquote>
+<p>libstd_x86_64-unknown-linux-gnu错误:</p>
+<blockquote>
+<p>The libtest_x86_64-unknown-linux-gnu lib is available in <a target="_blank" rel="noopener" href="https://cs.android.com/android/platform/superproject/+/master:prebuilts/rust/linux-x86/1.58.0/lib/rustlib/x86_64-unknown-linux-gnu/lib/">https://cs.android.com/android/platform/superproject/+/master:prebuilts/rust/linux-x86/1.58.0/lib/rustlib/x86_64-unknown-linux-gnu/lib/</a></p>
+<p>This lib will be downloaded as part of AOSP code in prebuilts&#x2F;rust.git. Try syncing this project again</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sh">repo <span class="hljs-built_in">sync</span> prebuilts/rust<br></code></pre></td></tr></table></figure>
+
+<p>The sync was failing for me with below error:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sh">error: RPC failed; curl 56 GnuTLS recv error (-54): Error <span class="hljs-keyword">in</span> the pull <span class="hljs-keyword">function</span><br></code></pre></td></tr></table></figure>
+
+<p>After installing gnutls-bin package it synced successfully.</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sh">sudo apt install gnutls-bin<br></code></pre></td></tr></table></figure>
+
+<p>文章来源:<a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/68436057/how-to-fix-libtest-x86-64-unknown-linux-gnu-module-dependencies">https://stackoverflow.com/questions/68436057/how-to-fix-libtest-x86-64-unknown-linux-gnu-module-dependencies</a></p>
+</blockquote>
+<p>基本的意思就是在prebuilts&#x2F;rust目录下的文件并没有git同步成功,尝试重新拉取一下.以下是我的方法.</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs sh"><span class="hljs-built_in">cd</span> prebuilts/rust<br>repo <span class="hljs-built_in">sync</span> <span class="hljs-comment">#这边可以加个-j参数,多线程加快一下速度</span><br></code></pre></td></tr></table></figure>
+
+<div id="paginator"></div></div><div id="post-footer"><div id="pages"><div id="footer-link" style="left: 50%;order: 0;border-left: 1px solid #fe2;padding-right: unset;max-width: calc(50% - 5px);"><a href="/2022/06/14/study-fpga-note2/">Icarus verilog的简单命令使用 Prev →</a></div></div></div></div><div id="bottom-btn"><a id="to-top" onClick="index.scrolltop();" title="to top" style="opacity: 0; display: none;">∧</a></div></article><div class="aside-box"><aside><div id="aside-top"><div id="about"><a href="/" id="logo"><img src="https://ak.hypergryph.com/assets/index/images/ak/pc/faction/1.png" alt="Logo"></a><h1 id="Dr"><a href="/">Poetryrain</a></h1><div id="description"><p></p></div><!--if page.published === undefined--><section id="total"><a id="total-archives" href="/archives"><span class="total-title">Archives Total:</span><span class="total-number">20</span></a><div id="total-tags"><span class="total-title">Tags:</span><span class="total-number">4</span></div><div id="total-categories"><span class="total-title">Categories:</span><span class="total-number">0</span></div></section></div><div id="aside-block"><div id="toc-div"><h1>INDEX</h1><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#1-%E7%A1%AC%E4%BB%B6%E7%8E%AF%E5%A2%83"><span class="toc-number">1.</span> <span class="toc-text">1. 硬件环境</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#2-%E5%AE%89%E8%A3%85%E4%BE%9D%E8%B5%96%E8%BD%AF%E4%BB%B6"><span class="toc-number">2.</span> <span class="toc-text">2. 安装依赖软件</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#3-%E5%AE%89%E8%A3%85-repo"><span class="toc-number">3.</span> <span class="toc-text">3. 安装 repo</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#4-%E4%B8%8B%E8%BD%BD%E6%BA%90%E7%A0%81"><span class="toc-number">4.</span> <span class="toc-text">4. 下载源码</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#5-%E7%BC%96%E8%AF%91"><span class="toc-number">5.</span> <span class="toc-text">5. 编译</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#6-%E6%9E%84%E5%BB%BA-Clang-llvm-%E5%B7%A5%E5%85%B7%E9%93%BE"><span class="toc-number">6.</span> <span class="toc-text">6. 构建 Clang llvm 工具链</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#7-%E6%9E%84%E5%BB%BA-Rust-%E5%B7%A5%E5%85%B7%E9%93%BE"><span class="toc-number">7.</span> <span class="toc-text">7. 构建 Rust 工具链</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%A5%E4%B8%8B%E4%B8%BA%E6%88%91%E4%B8%AA%E4%BA%BA%E5%B0%9D%E8%AF%95%E7%9A%84%E6%93%8D%E4%BD%9C"><span class="toc-number">7.0.1.</span> <span class="toc-text">以下为我个人尝试的操作:</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%A5%E4%B8%8B%E4%B8%BA%E6%8A%A5%E9%94%99%E5%92%8C%E7%9B%B8%E5%85%B3%E5%A4%84%E7%90%86"><span class="toc-number">7.0.2.</span> <span class="toc-text">以下为报错和相关处理:</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#ubuntu19-04-x2F-Manjro%E7%BC%96%E8%AF%91Android-Pie%E6%BA%90%E7%A0%81%E7%BC%BA%E5%B0%91libtinfo-so-5%E9%97%AE%E9%A2%98"><span class="toc-number">7.0.3.</span> <span class="toc-text">ubuntu19.04&#x2F;Manjro编译Android Pie源码缺少libtinfo.so.5问题</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%83%8C%E6%99%AF"><span class="toc-number">7.0.4.</span> <span class="toc-text">背景</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95"><span class="toc-number">7.0.5.</span> <span class="toc-text">解决方法</span></a></li></ol></li></ol></li></ol></div></div></div><footer><nobr><span class="text-title">©</span><span class="text-content">1970 to 2020</span></nobr><br><nobr><span class="text-title">ICP</span><span class="text-content">——备案号——</span></nobr><br><text>published with <a target="_blank" rel="noopener" href="http://hexo.io">Hexo</a></text><text> Theme <a target="_blank" rel="noopener" href="https://github.com/Yue-plus/hexo-theme-arknights">Arknight</a></text><wbr><text>by <a target="_blank" rel="noopener" href="https://github.com/Yue-plus">Yue_plus</a></text></footer></aside></div></main><canvas id="canvas-dust"></canvas><script src="/js/search.js"></script><script>const reset=_=>{}</script><script src="//unpkg.com/@highlightjs/cdn-assets@11.4.0/highlight.min.js"></script><script src="/js/arknights.js"></script><script>document.addEventListener("load",reset())</script></body></html>
